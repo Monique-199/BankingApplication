@@ -3,10 +3,15 @@ package com.kerubo.BankingApplication.repository;
 import com.kerubo.BankingApplication.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.util.Optional;
+
 public interface UserRepository extends JpaRepository<User, Long> {
 
     // This checks if an email exists in the database
     Boolean existsByEmail(String email);
+
+
+    Optional<User> findByEmail(String email);
 
     // This checks if an account number exists in the database
     Boolean existsByAccountNumber(String accountNumber);

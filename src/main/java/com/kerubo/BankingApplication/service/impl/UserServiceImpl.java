@@ -1,26 +1,41 @@
 package com.kerubo.BankingApplication.service.impl;
 
+import com.kerubo.BankingApplication.config.JwtTokenProvider;
 import com.kerubo.BankingApplication.dto.*;
+import com.kerubo.BankingApplication.entity.Role;
 import com.kerubo.BankingApplication.entity.User;
 import com.kerubo.BankingApplication.repository.UserRepository;
 import com.kerubo.BankingApplication.util.AccountUtils;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+@AllArgsConstructor
 
 @Service
 public class UserServiceImpl implements UserService {
 
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    AuthenticationManager authenticationManager;
 
     @Autowired
     EmailService emailService;
 
     @Autowired
     TransactionService transactionService;
+    @Autowired
+    JwtTokenProvider jwtTokenProvider;
+
+    @Autowired
+    PasswordEncoder passwordEncoder;
 
     @Override
     public BankResponse createAccount(UserRequest userRequest) {
@@ -37,14 +52,17 @@ public class UserServiceImpl implements UserService {
                 .firstName(userRequest.getFirstName())
                 .lastName(userRequest.getLastName())
                 .gender(userRequest.getGender())
+                .othername(userRequest.getOthername())
                 .address(userRequest.getAddress())
                 .stateOfOrigin(userRequest.getStateOfOrigin())
                 .accountNumber(AccountUtils.generateAccountNumber())
                 .accountBalance(BigDecimal.ZERO)
+                .password(passwordEncoder.encode(userRequest.getPassword()))
                 .email(userRequest.getEmail())
                 .phoneNumber(userRequest.getPhoneNumber())
                 .alternativePhoneNumber(userRequest.getAlternativePhoneNumber())
                 .status("ACTIVE")
+                .role(Role.valueOf("ROLE_ADMIN"))
                 .build();
 
         User savedUser = userRepository.save(newUser);
@@ -70,7 +88,23 @@ public class UserServiceImpl implements UserService {
                         .build())
                 .build();
     }
+    public BankResponse login(LoginDto loginDto){
+        Authentication authentication = null;
+        authentication= authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(loginDto.getEmail(),loginDto.getPassword())
+        );
+        EmailDetails loginAlert = EmailDetails.builder()
+                .subject("You're logged in!")
+                .recipient(loginDto.getEmail())
+                .messageBody("You logged in to your account. If you did not initiate this transanction, please contact your bank")
+                .build();
+        emailService.sendEmailAlert(loginAlert);
+        return BankResponse.builder()
+                .responseCode("Login Success")
+                .responseMessage(jwtTokenProvider.generateToken(authentication))
+                .build();
 
+    }
     @Override
     public BankResponse balanceInquiry(InquiryRequest request) {
         // Check if the account exists in the database
@@ -254,5 +288,7 @@ public class UserServiceImpl implements UserService {
                 .responseMessage(AccountUtils.TRANSFER_ACCOUNT_SUCCESS_MESSAGE)
                 .accountInfo(null)
                 .build();
+
     }
-}
+
+    }
